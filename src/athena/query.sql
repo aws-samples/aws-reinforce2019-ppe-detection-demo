@@ -1,0 +1,1 @@
+SELECT * FROM ppe_non_compliant
