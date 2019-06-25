@@ -1,0 +1,214 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: 'PPE demo architecture CloudFormation template.'
+
+Parameters:
+  emailSNS:
+    Description: 'Email to receive notifications.'
+    Type: String
+  iotTopic:
+    Description: 'Alarm topic.'
+    Type: String
+    Default: ppe_alarm_topic
+
+Resources:
+  lambdaDetectionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub 'ppe-lambda-detection-role-${AWS::AccountId}'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonRekognitionReadOnlyAccess
+        - arn:aws:iam::aws:policy/AWSIoTDataAccess
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
+      Policies:
+        -
+          PolicyName: !Sub 'ppe-lambda-detection-policy-${AWS::AccountId}'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action: "logs:CreateLogGroup"
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ppe-detection-function-${AWS::AccountId}:*"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+
+  lambdaNotificationRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub 'ppe-lambda-notification-role-${AWS::AccountId}'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+      Policies:
+        -
+          PolicyName: !Sub 'ppe-lambda-notification-policy-${AWS::AccountId}'
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action: "logs:CreateLogGroup"
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ppe-notification-function-${AWS::AccountId}:*"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+
+  pilLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+        - 'python3.7'
+      Content:
+        S3Bucket: !Sub 'ppe-code-bucket-${AWS::AccountId}'
+        S3Key: package.zip
+      Description: PIL lib to work with images.
+      LayerName: !Sub 'ppe-pil-layer-${AWS::AccountId}'
+
+  detectionLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        S3Bucket: !Sub 'ppe-code-bucket-${AWS::AccountId}'
+        S3Key: detection_function.zip
+      Description: 'Detect workers without PPE.'
+      FunctionName: !Sub 'ppe-detection-function-${AWS::AccountId}'
+      Handler: 'detection_function.lambda_handler'
+      Environment:
+        Variables:
+          iot_topic: !Ref iotTopic
+          notification_function_name: !Ref notificationLambda
+      Runtime: 'python3.7'
+      Role: !GetAtt lambdaDetectionRole.Arn
+
+  notificationLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        S3Bucket: !Sub 'ppe-code-bucket-${AWS::AccountId}'
+        S3Key: notification_function.zip
+      Description: 'Notify non-compliant.'
+      FunctionName: !Sub 'ppe-notification-function-${AWS::AccountId}'
+      Handler: 'notification_function.lambda_handler'
+      Environment:
+        Variables:
+          data_bucket: !Ref bucketS3Data
+          sns_topic: !Ref topicSNS
+      Runtime: 'python3.7'
+      Layers:
+        - !Ref pilLayer
+      Role: !GetAtt lambdaNotificationRole.Arn
+
+  topicSNS:
+    Type: 'AWS::SNS::Topic'
+    Properties:
+      DisplayName: 'PPE ALERT'
+      TopicName: !Sub 'ppe-noncompliant-topic-${AWS::AccountId}'
+
+  subscriptionSNS:
+    Type: 'AWS::SNS::Subscription'
+    Properties:
+      Protocol: 'EMAIL'
+      Endpoint: !Ref emailSNS
+      TopicArn: !Ref topicSNS
+
+  bucketS3Data:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub 'ppe-data-bucket-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+
+  thingIoT:
+    Type: 'AWS::IoT::Thing'
+    Properties:
+      ThingName: !Sub 'ppe-raspberry-${AWS::AccountId}'
+
+  thingPolicy:
+    Type: 'AWS::IoT::Policy'
+    Properties:
+      PolicyName: !Sub '${thingIoT}-Policy'
+      PolicyDocument:
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "iot:Publish",
+                "iot:Receive"
+              ],
+              "Resource": [
+                !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topic/${iotTopic}"
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "iot:Subscribe"
+              ],
+              "Resource": [
+                !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topicfilter/${iotTopic}"
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "iot:Connect"
+              ],
+              "Resource": [
+                !Sub "arn:aws:iot:${AWS::Region}:${AWS::AccountId}:client/alarm*"
+              ]
+            }
+          ]
+        }
+
+Outputs:
+   LambdaDetection:
+     Description: Lambda to update IoT topic and call notification function.
+     Value: !Ref detectionLambda
+
+   LambdaNotification:
+     Description: Lambda to notify non-compliant, store image and csv.
+     Value: !Ref notificationLambda
+
+   IoTThing:
+     Description: RaspberryPi.
+     Value: !Ref thingIoT
+
+   SNSTopic:
+     Description: SNS topic to send notifications.
+     Value: !GetAtt topicSNS.TopicName
+
+   DataBucket:
+     Description: Bucket to save images and csv.
+     Value: !Ref bucketS3Data

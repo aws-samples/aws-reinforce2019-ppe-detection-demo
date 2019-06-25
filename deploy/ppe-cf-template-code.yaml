@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'PPE demo code CloudFormation template.'
+
+Mappings:
+  RegionAndResource:
+    us-east-1:
+      image: "ami-0cc96feef8c6bbff3"
+
+Resources:
+  ec2S3Role:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub 'ppe-ec2S3-role-${AWS::AccountId}'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+
+  S3InstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref ec2S3Role
+
+  bucketS3Code:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub 'ppe-code-bucket-${AWS::AccountId}'
+
+  layerEC2:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      IamInstanceProfile: !Ref S3InstanceProfile
+      InstanceInitiatedShutdownBehavior: terminate
+      ImageId: !FindInMap [RegionAndResource, !Ref "AWS::Region", image]
+      InstanceType: t2.micro
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install python3 -y
+          curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+          python3 get-pip.py
+          mkdir -p build/python/lib/python3.7/site-packages
+          cd build/
+          pip install Pillow -t python/lib/python3.7/site-packages/
+          zip -r package.zip .
+          aws s3 cp package.zip s3://ppe-code-bucket-${AWS::AccountId}
+          shutdown now
+
+Outputs:
+   CodeBucket:
+     Description: Bucket to store lambda code and layers.
+     Value: !Ref bucketS3Code
