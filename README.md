@@ -1,12 +1,25 @@
 ## AWS re:Inforce 2019 PPE Detection Demo
 
+The purpose of Personal Protective Equipment (PPE) is to prevent injuries in the workplace, protect the wearer's body, and reduce exposure to different hazards, such as physical, electrical, chemical, and others. While the usage of such protective gear is essential and legally required in many industry sectors, it is common to see workers forgetting or neglecting the use of PPE.
+
+This demo was presented in the **re:Inforce 2019 Builders Fair** and contains a prototype approach using several AWS services to help prevent accidents in the workplace.
+
 ![architecture](images/architecture.jpg)
+
+To get started you will need:
+
+- The [AWS CLI](https://aws.amazon.com/cli/) tool installed on your local machine.
+- Python 3.7 with [boto3](https://pypi.org/project/boto3/) and [python-opencv](https://pypi.org/project/opencv-python/) libraries installed on your local machine:
+    ```
+    pip install -r requirements.txt
+    ```
+- A Raspberry Pi with the [omxplayer](https://www.raspberrypi.org/documentation/raspbian/applications/omxplayer.md) package installed.
+- Tested in the N. Virginia region (us-east-1).
+
 
 ## 1. Installation
 
 ### 1.1 Create resources on your AWS account
-
-In order to start the installation process, you're going to need the [AWS CLI](https://aws.amazon.com/cli/) tool installed on your machine.
 
 1. Download the .zip or clone this repo on your machine.
 
@@ -44,6 +57,7 @@ Now that you have created the AWS resources in the previous step, you need to up
     ./start.sh
     ```
 
+
 ## 2. Running
 
 1. Make sure the `./start.sh` script is still running in your Raspberry Pi.
@@ -53,11 +67,17 @@ Now that you have created the AWS resources in the previous step, you need to up
     python src/webcam_client.py
     ```
 
+
 ## 3. Optional
 
-The `src/athena` directory contains source files to make queries in Amazon Athena and create dashboards with Amazon QuickSight.
+The `src/athena` directory contains source files to make queries in Amazon Athena and create dashboards with Amazon QuickSight. Make sure you change the `<your_data_bucket>` present in `src/athena/table.sql`.
 
 ![dashboard-image](images/dashboard.png)
+
+
+## 4. Clean up
+
+You can remove the AWS resources created for this demo by running `./deploy delete`.
 
 
 ## License Summary

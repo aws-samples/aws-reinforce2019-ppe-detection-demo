@@ -9,4 +9,4 @@ ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe'
 WITH SERDEPROPERTIES (
     'serialization.format' = ',',
     'field.delim' = ','
-) LOCATION 's3://<YOUR_DATA_BUCKET>/responses/'
+) LOCATION 's3://<your_data_bucket>/responses/'
