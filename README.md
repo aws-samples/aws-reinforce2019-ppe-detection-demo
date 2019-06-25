@@ -1,5 +1,6 @@
 ## AWS re:Inforce 2019 PPE Detection Demo
 
+![architecture](images/architecture.jpg)
 
 ## 1. Installation
 
