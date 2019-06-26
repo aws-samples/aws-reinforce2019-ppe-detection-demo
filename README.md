@@ -2,6 +2,8 @@
 
 The purpose of Personal Protective Equipment (PPE) is to prevent injuries in the workplace, protect the wearer's body, and reduce exposure to different hazards, such as physical, electrical, chemical, and others. While the usage of such protective gear is essential and legally required in many industry sectors, it is common to see workers forgetting or neglecting the use of PPE.
 
+![demo](images/reinforce-demo.gif)
+
 This demo was presented in the **re:Inforce 2019 Builders Fair** and contains a prototype approach using several AWS services to help prevent accidents in the workplace.
 
 ![architecture](images/architecture.jpg)
