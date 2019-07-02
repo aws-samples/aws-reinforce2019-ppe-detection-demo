@@ -90,6 +90,10 @@ if __name__ == '__main__':
     frame_skip = 30
     frame_count = 0
 
+    winname = 'Press ESC or Q to quit'
+    cv2.namedWindow(winname)
+    cv2.moveWindow(winname, 50, 50)
+
     while True:
         # Grab a single frame of video
         ret, frame = cap.read()
@@ -98,7 +102,7 @@ if __name__ == '__main__':
 
         if frame_count % frame_skip == 0:  # only analyze every n frames
             detect_ppe(frame, client)
-            cv2.imshow("Press ESC or Q to quit", frame)
+            cv2.imshow(winname, frame)
 
         frame_count += 1
 
